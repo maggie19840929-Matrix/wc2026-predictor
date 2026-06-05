@@ -91,15 +91,15 @@ export function RecommendationCard({ result, homeTeam, awayTeam }: Props) {
           </div>
         )}
 
-        {/* 去爱游戏投注 */}
-        <a
-          href="https://www.ayx.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-center text-sm transition-all"
-        >
-          去爱游戏投注 · {teamLabel} @ {result.ayxOdds} →
-        </a>
+        {/* 投注提示 */}
+        <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-yellow-300 font-black text-base">
+            📱 去爱游戏手动下注
+          </p>
+          <p className="text-yellow-400 text-sm mt-1">
+            {teamLabel} · 赔率 {result.ayxOdds}
+          </p>
+        </div>
 
         <p className="text-center text-xs text-gray-600">
           理性博彩，量力而行。以上为辅助分析，不构成投资建议。
