@@ -4,7 +4,9 @@ import { PredictionBar } from "@/components/ui/PredictionBar";
 import { ValueBadge } from "@/components/ui/ValueBadge";
 import { OddsTable } from "@/components/match/OddsTable";
 import { MatchDetailClient } from "@/components/match/MatchDetailClient";
+import { TeamStatsPanel } from "@/components/match/TeamStatsPanel";
 import { detectValueBets } from "@/lib/value-bet";
+import { getTeamRecentForm, getH2H } from "@/lib/team-stats";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -57,6 +59,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const canPredict = new Date(match.utc_date) > new Date() && match.status === "TIMED";
   const valueBets = detectValueBets(match);
   const oddsDetail: BookmakerOdds[] = (row.odds_detail as BookmakerOdds[]) ?? [];
+
+  // 并行拉取客观数据
+  const [homeForm, awayForm, h2h] = await Promise.all([
+    getTeamRecentForm(match.home_team.id),
+    getTeamRecentForm(match.away_team.id),
+    getH2H(match.api_id, match.home_team.id, match.away_team.id),
+  ]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -122,6 +131,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
+      {/* 客观数据面板 */}
+      <TeamStatsPanel
+        homeTeam={match.home_team.shortName}
+        awayTeam={match.away_team.shortName}
+        homeForm={homeForm}
+        awayForm={awayForm}
+        h2h={h2h}
+      />
+
       {/* 综合推荐 + 爱游戏赔率录入 */}
       <MatchDetailClient
         matchId={id}
@@ -135,6 +153,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         initialAyxDraw={match.draw_odds ?? undefined}
         initialAyxAway={match.away_odds ?? undefined}
         bookmakers={oddsDetail}
+        homeForm={homeForm}
+        awayForm={awayForm}
+        h2h={h2h}
       />
 
       {/* 多平台赔率对比 */}

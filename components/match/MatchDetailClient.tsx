@@ -5,6 +5,7 @@ import { AyxOddsForm } from "./AyxOddsForm";
 import { RecommendationCard } from "./RecommendationCard";
 import { recommend } from "@/lib/recommendation";
 import type { BookmakerOdds } from "@/lib/odds-api";
+import type { RecentForm, H2HRecord } from "@/lib/team-stats";
 
 interface Props {
   matchId: string;
@@ -18,6 +19,9 @@ interface Props {
   initialAyxDraw?: number;
   initialAyxAway?: number;
   bookmakers: BookmakerOdds[];
+  homeForm?: RecentForm;
+  awayForm?: RecentForm;
+  h2h?: H2HRecord;
 }
 
 export function MatchDetailClient({
@@ -32,6 +36,9 @@ export function MatchDetailClient({
   initialAyxDraw,
   initialAyxAway,
   bookmakers,
+  homeForm,
+  awayForm,
+  h2h,
 }: Props) {
   const [ayxHome, setAyxHome] = useState(initialAyxHome);
   const [ayxDraw, setAyxDraw] = useState(initialAyxDraw);
@@ -47,7 +54,10 @@ export function MatchDetailClient({
           communityDraw,
           communityAway,
           { home: ayxHome, draw: ayxDraw, away: ayxAway },
-          bookmakers
+          bookmakers,
+          homeForm,
+          awayForm,
+          h2h,
         )
       : null;
 

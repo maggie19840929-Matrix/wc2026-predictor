@@ -1,4 +1,5 @@
 import type { BookmakerOdds } from "@/lib/odds-api";
+import type { RecentForm, H2HRecord } from "@/lib/team-stats";
 
 export type Outcome = "HOME" | "DRAW" | "AWAY";
 
@@ -40,7 +41,10 @@ export function recommend(
   communityDraw: number,
   communityAway: number,
   ayx: AyxOdds,
-  bookmakers: BookmakerOdds[]
+  bookmakers: BookmakerOdds[],
+  homeForm?: RecentForm,
+  awayForm?: RecentForm,
+  h2h?: H2HRecord,
 ): RecommendationResult {
   const comm = {
     home: communityHome / 100,
@@ -82,9 +86,32 @@ export function recommend(
     away: comm.away - marketFair.away,
   };
 
-  // 综合评分：社区概率(40%) + 爱游戏价值(40%) + 市场共识(20%)
+  // 客观数据评分（近期状态 + 历史交锋）
+  let formBoost = { home: 0, draw: 0, away: 0 };
+  if (homeForm && awayForm && homeForm.played > 0 && awayForm.played > 0) {
+    const homeWinRate = homeForm.wins / homeForm.played;
+    const awayWinRate = awayForm.wins / awayForm.played;
+    const homeGoalDiff = (homeForm.goalsFor - homeForm.goalsAgainst) / homeForm.played;
+    const awayGoalDiff = (awayForm.goalsFor - awayForm.goalsAgainst) / awayForm.played;
+    // 状态差距越大，对强队方向加分
+    const formDiff = (homeWinRate + homeGoalDiff * 0.05) - (awayWinRate + awayGoalDiff * 0.05);
+    formBoost.home = formDiff * 0.1;
+    formBoost.away = -formDiff * 0.1;
+  }
+
+  let h2hBoost = { home: 0, draw: 0, away: 0 };
+  if (h2h && h2h.played >= 3) {
+    const homeH2HRate = h2h.homeWins / h2h.played;
+    const awayH2HRate = h2h.awayWins / h2h.played;
+    const drawH2HRate = h2h.draws / h2h.played;
+    h2hBoost.home = (homeH2HRate - 0.33) * 0.08;
+    h2hBoost.away = (awayH2HRate - 0.33) * 0.08;
+    h2hBoost.draw = (drawH2HRate - 0.33) * 0.08;
+  }
+
+  // 综合评分：社区(35%) + 爱游戏价值(30%) + 市场共识(15%) + 近期状态(12%) + 历史交锋(8%)
   const score = (o: "home" | "draw" | "away") =>
-    comm[o] * 0.4 + ayxEdge[o] * 0.4 + marketEdge[o] * 0.2;
+    comm[o] * 0.35 + ayxEdge[o] * 0.30 + marketEdge[o] * 0.15 + formBoost[o] * 0.12 + h2hBoost[o] * 0.08;
 
   const scores = {
     home: score("home"),
