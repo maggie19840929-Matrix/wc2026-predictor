@@ -40,7 +40,7 @@ export function AyxOddsForm({ matchId, initialHome, initialDraw, initialAway, on
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SYNC_SECRET || "my-secret-key-123"}`,
       },
-      body: JSON.stringify({ match_id: matchId, home_odds: h, draw_odds: d, away_odds: a }),
+      body: JSON.stringify({ match_id: matchId, home_odds: h, draw_odds: d, away_odds: a, secret: "my-secret-key-123" }),
     });
     setSaving(false);
 
