@@ -52,10 +52,9 @@ export function MatchDetailClient({
   );
 
   const hasAyx = ayxHome && ayxDraw && ayxAway;
-  const hasCommunity = totalPredictions >= 1;
 
   const recommendation =
-    hasAyx && hasCommunity
+    hasAyx
       ? recommend(
           communityHome,
           communityDraw,
@@ -111,10 +110,7 @@ export function MatchDetailClient({
         <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-6 text-center space-y-2">
           <p className="text-2xl">🎯</p>
           <p className="text-gray-300 font-semibold">综合推荐待生成</p>
-          <p className="text-gray-500 text-sm">
-            {!hasAyx && "请先录入爱游戏赔率"}
-            {hasAyx && !hasCommunity && "需要至少3人完成预测"}
-          </p>
+          <p className="text-gray-500 text-sm">请先录入爱游戏赔率</p>
         </div>
       )}
     </div>
