@@ -51,22 +51,28 @@ export function MatchDetailClient({
     initialSubjective?.subj_home_form ? (initialSubjective as SubjectiveData) : undefined
   );
 
-  const hasAyx = ayxHome && ayxDraw && ayxAway;
+  const hasAyx = !!(ayxHome && ayxDraw && ayxAway);
 
-  const recommendation =
-    hasAyx
-      ? recommend(
-          communityHome,
-          communityDraw,
-          communityAway,
-          { home: ayxHome, draw: ayxDraw, away: ayxAway },
-          bookmakers,
-          homeForm,
-          awayForm,
-          h2h,
-          subjective,
-        )
-      : null;
+  // 没有AYX赔率时用各庄最佳赔率代替，确保卡片始终显示
+  const bestHome = hasAyx ? ayxHome! : bookmakers.length > 0 ? Math.max(...bookmakers.map(b => b.home)) : 2.0;
+  const bestDraw = hasAyx ? ayxDraw! : bookmakers.length > 0 ? Math.max(...bookmakers.map(b => b.draw)) : 3.0;
+  const bestAway = hasAyx ? ayxAway! : bookmakers.length > 0 ? Math.max(...bookmakers.map(b => b.away)) : 3.5;
+
+  const canRecommend = bestHome > 1 && bestDraw > 1 && bestAway > 1;
+
+  const recommendation = canRecommend
+    ? recommend(
+        communityHome,
+        communityDraw,
+        communityAway,
+        { home: bestHome, draw: bestDraw, away: bestAway },
+        bookmakers,
+        homeForm,
+        awayForm,
+        h2h,
+        subjective,
+      )
+    : null;
 
   return (
     <div className="space-y-4">
