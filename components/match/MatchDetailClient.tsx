@@ -101,6 +101,11 @@ export function MatchDetailClient({
           result={recommendation}
           homeTeam={homeTeam}
           awayTeam={awayTeam}
+          communityHome={communityHome}
+          communityDraw={communityDraw}
+          communityAway={communityAway}
+          hasSubjective={!!subjective}
+          hasH2H={!!(h2h && h2h.played > 0)}
         />
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-6 text-center space-y-2">
