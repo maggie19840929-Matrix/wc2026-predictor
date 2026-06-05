@@ -52,7 +52,7 @@ export function MatchDetailClient({
   );
 
   const hasAyx = ayxHome && ayxDraw && ayxAway;
-  const hasCommunity = totalPredictions >= 3;
+  const hasCommunity = totalPredictions >= 1;
 
   const recommendation =
     hasAyx && hasCommunity
