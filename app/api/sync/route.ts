@@ -14,7 +14,9 @@ export async function POST(req: Request) {
   );
 
   const data = await getMatches();
-  const matches = data.matches.map(normalizeMatch);
+  const matches = data.matches
+    .filter((m: { homeTeam: { id: number | null } }) => m.homeTeam?.id != null)
+    .map(normalizeMatch);
 
   const { error } = await supabase
     .from("matches")

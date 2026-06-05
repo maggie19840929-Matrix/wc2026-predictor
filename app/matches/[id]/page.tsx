@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { PredictFormClient } from "@/components/prediction/PredictFormClient";
 import { PredictionBar } from "@/components/ui/PredictionBar";
 import { ValueBadge } from "@/components/ui/ValueBadge";
+import { OddsTable } from "@/components/match/OddsTable";
 import { detectValueBets } from "@/lib/value-bet";
+import type { BookmakerOdds } from "@/lib/odds-api";
 import Image from "next/image";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -53,6 +55,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const match = toMatch(row);
   const canPredict = new Date(match.utc_date) > new Date() && match.status === "TIMED";
   const valueBets = detectValueBets(match);
+  const oddsDetail: BookmakerOdds[] = (row.odds_detail as BookmakerOdds[]) ?? [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -117,6 +120,18 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <p className="text-gray-500 text-sm">还没有人预测，成为第一个！</p>
         )}
       </div>
+
+      {/* 多平台赔率对比 */}
+      {oddsDetail.length > 0 && (
+        <OddsTable
+          bookmakers={oddsDetail}
+          homeTeam={match.home_team.shortName}
+          awayTeam={match.away_team.shortName}
+          communityHome={match.home_pct}
+          communityDraw={match.draw_pct}
+          communityAway={match.away_pct}
+        />
+      )}
 
       {/* Predict form (client, reads username from localStorage) */}
       {canPredict ? (
