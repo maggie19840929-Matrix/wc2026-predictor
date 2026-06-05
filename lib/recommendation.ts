@@ -8,6 +8,7 @@ export interface SubjectiveData {
   subj_away_form: number;   // 1-5
   subj_motivation: number;  // -2~2, 正=有利主队
   subj_venue: number;       // -2~2, 正=有利主队
+  subj_intel: string;       // 特别情报文字
   subj_home_intel: number;  // -2~2
   subj_away_intel: number;  // -2~2
 }
