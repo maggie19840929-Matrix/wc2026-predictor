@@ -74,8 +74,16 @@ export function MatchDetailClient({
       )
     : null;
 
+  // debug
+  console.log("MatchDetailClient render", { hasAyx, canRecommend, bestHome, bestDraw, bestAway, bookmakers: bookmakers.length });
+
   return (
     <div className="space-y-4">
+      {/* DEBUG 临时显示 */}
+      <div className="bg-red-900 border border-red-500 rounded-xl p-3 text-xs text-red-200 font-mono">
+        DEBUG: hasAyx={String(hasAyx)} canRecommend={String(canRecommend)} bestHome={bestHome} bookmakers={bookmakers.length}
+      </div>
+
       {/* 主观评估录入 */}
       <SubjectiveForm
         matchId={matchId}
