@@ -156,6 +156,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         homeForm={homeForm}
         awayForm={awayForm}
         h2h={h2h}
+        initialSubjective={{
+          subj_home_form: row.subj_home_form ?? undefined,
+          subj_away_form: row.subj_away_form ?? undefined,
+          subj_motivation: row.subj_motivation ?? undefined,
+          subj_venue: row.subj_venue ?? undefined,
+          subj_intel: row.subj_intel ?? undefined,
+          subj_home_intel: row.subj_home_intel ?? undefined,
+          subj_away_intel: row.subj_away_intel ?? undefined,
+        }}
       />
 
       {/* 多平台赔率对比 */}

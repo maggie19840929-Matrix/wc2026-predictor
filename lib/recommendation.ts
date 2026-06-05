@@ -3,6 +3,15 @@ import type { RecentForm, H2HRecord } from "@/lib/team-stats";
 
 export type Outcome = "HOME" | "DRAW" | "AWAY";
 
+export interface SubjectiveData {
+  subj_home_form: number;   // 1-5
+  subj_away_form: number;   // 1-5
+  subj_motivation: number;  // -2~2, 正=有利主队
+  subj_venue: number;       // -2~2, 正=有利主队
+  subj_home_intel: number;  // -2~2
+  subj_away_intel: number;  // -2~2
+}
+
 export interface AyxOdds {
   home: number;
   draw: number;
@@ -45,6 +54,7 @@ export function recommend(
   homeForm?: RecentForm,
   awayForm?: RecentForm,
   h2h?: H2HRecord,
+  subjective?: SubjectiveData,
 ): RecommendationResult {
   const comm = {
     home: communityHome / 100,
@@ -109,9 +119,30 @@ export function recommend(
     h2hBoost.draw = (drawH2HRate - 0.33) * 0.08;
   }
 
-  // 综合评分：社区(35%) + 爱游戏价值(30%) + 市场共识(15%) + 近期状态(12%) + 历史交锋(8%)
+  // 主观评估加分
+  let subjBoost = { home: 0, draw: 0, away: 0 };
+  if (subjective) {
+    const { subj_home_form, subj_away_form, subj_motivation, subj_venue, subj_home_intel, subj_away_intel } = subjective;
+    // 状态差距 (1-5分归一化到-0.1~0.1)
+    const formDiff = (subj_home_form - subj_away_form) / 5 * 0.1;
+    subjBoost.home += formDiff;
+    subjBoost.away -= formDiff;
+    // 赛事动力 (-2~2 归一化)
+    subjBoost.home += subj_motivation / 2 * 0.06;
+    subjBoost.away -= subj_motivation / 2 * 0.06;
+    // 场地气候
+    subjBoost.home += subj_venue / 2 * 0.05;
+    subjBoost.away -= subj_venue / 2 * 0.05;
+    // 特别情报
+    subjBoost.home += subj_home_intel / 2 * 0.05;
+    subjBoost.away += subj_away_intel / 2 * 0.05;
+  }
+
+  // 综合评分：社区(30%) + 爱游戏价值(25%) + 市场共识(15%) + 客观数据(15%) + 主观评估(15%)
   const score = (o: "home" | "draw" | "away") =>
-    comm[o] * 0.35 + ayxEdge[o] * 0.30 + marketEdge[o] * 0.15 + formBoost[o] * 0.12 + h2hBoost[o] * 0.08;
+    comm[o] * 0.30 + ayxEdge[o] * 0.25 + marketEdge[o] * 0.15
+    + (formBoost[o] * 0.10 + h2hBoost[o] * 0.05)
+    + subjBoost[o] * 0.15;
 
   const scores = {
     home: score("home"),
@@ -161,6 +192,21 @@ export function recommend(
   if (bookmakers.length > 0) {
     const marketProb = Math.round(marketFair[outcomeKey] * 100);
     reasons.push(`各庄综合隐含概率 ${marketProb}%，与社区判断${Math.abs(communityProb * 100 - marketProb) < 5 ? "一致" : "存在分歧"}`);
+  }
+
+  if (subjective) {
+    const { subj_home_form, subj_away_form, subj_motivation, subj_venue } = subjective;
+    if (Math.abs(subj_home_form - subj_away_form) >= 2) {
+      const stronger = subj_home_form > subj_away_form ? "主队" : "客队";
+      reasons.push(`主观评估：${stronger}近期状态明显更佳`);
+    }
+    if (Math.abs(subj_motivation) >= 1) {
+      const side = subj_motivation > 0 ? "主队" : "客队";
+      reasons.push(`${side}求胜动力更强，赛事重要性加分`);
+    }
+    if (Math.abs(subj_venue) >= 1) {
+      reasons.push(subj_venue > 0 ? "场地/气候有利主队" : "场地/气候不利主队");
+    }
   }
 
   // 警告

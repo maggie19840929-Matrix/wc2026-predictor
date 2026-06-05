@@ -4,8 +4,10 @@ import { useState } from "react";
 import { AyxOddsForm } from "./AyxOddsForm";
 import { RecommendationCard } from "./RecommendationCard";
 import { recommend } from "@/lib/recommendation";
+import { SubjectiveForm } from "./SubjectiveForm";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import type { RecentForm, H2HRecord } from "@/lib/team-stats";
+import type { SubjectiveData } from "@/lib/recommendation";
 
 interface Props {
   matchId: string;
@@ -22,6 +24,7 @@ interface Props {
   homeForm?: RecentForm;
   awayForm?: RecentForm;
   h2h?: H2HRecord;
+  initialSubjective?: Partial<SubjectiveData>;
 }
 
 export function MatchDetailClient({
@@ -39,10 +42,14 @@ export function MatchDetailClient({
   homeForm,
   awayForm,
   h2h,
+  initialSubjective,
 }: Props) {
   const [ayxHome, setAyxHome] = useState(initialAyxHome);
   const [ayxDraw, setAyxDraw] = useState(initialAyxDraw);
   const [ayxAway, setAyxAway] = useState(initialAyxAway);
+  const [subjective, setSubjective] = useState<SubjectiveData | undefined>(
+    initialSubjective?.subj_home_form ? (initialSubjective as SubjectiveData) : undefined
+  );
 
   const hasAyx = ayxHome && ayxDraw && ayxAway;
   const hasCommunity = totalPredictions >= 3;
@@ -58,11 +65,21 @@ export function MatchDetailClient({
           homeForm,
           awayForm,
           h2h,
+          subjective,
         )
       : null;
 
   return (
     <div className="space-y-4">
+      {/* 主观评估录入 */}
+      <SubjectiveForm
+        matchId={matchId}
+        homeTeam={homeTeam}
+        awayTeam={awayTeam}
+        initial={initialSubjective}
+        onSaved={(data) => setSubjective(data)}
+      />
+
       {/* 录入爱游戏赔率 */}
       <div className="flex justify-end">
         <AyxOddsForm
