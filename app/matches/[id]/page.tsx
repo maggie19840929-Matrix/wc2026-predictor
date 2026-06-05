@@ -3,6 +3,7 @@ import { PredictFormClient } from "@/components/prediction/PredictFormClient";
 import { PredictionBar } from "@/components/ui/PredictionBar";
 import { ValueBadge } from "@/components/ui/ValueBadge";
 import { OddsTable } from "@/components/match/OddsTable";
+import { MatchDetailClient } from "@/components/match/MatchDetailClient";
 import { detectValueBets } from "@/lib/value-bet";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import Image from "next/image";
@@ -120,6 +121,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <p className="text-gray-500 text-sm">还没有人预测，成为第一个！</p>
         )}
       </div>
+
+      {/* 综合推荐 + 爱游戏赔率录入 */}
+      <MatchDetailClient
+        matchId={id}
+        homeTeam={match.home_team.shortName}
+        awayTeam={match.away_team.shortName}
+        communityHome={match.home_pct}
+        communityDraw={match.draw_pct}
+        communityAway={match.away_pct}
+        totalPredictions={match.total_predictions}
+        initialAyxHome={match.home_odds ?? undefined}
+        initialAyxDraw={match.draw_odds ?? undefined}
+        initialAyxAway={match.away_odds ?? undefined}
+        bookmakers={oddsDetail}
+      />
 
       {/* 多平台赔率对比 */}
       {oddsDetail.length > 0 && (
