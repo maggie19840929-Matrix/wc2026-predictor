@@ -96,6 +96,30 @@ export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }
   const [intel, setIntel] = useState(initial?.subj_intel ?? "");
   const [homeIntel, setHomeIntel] = useState(initial?.subj_home_intel ?? 0);
   const [awayIntel, setAwayIntel] = useState(initial?.subj_away_intel ?? 0);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiHeadlines, setAiHeadlines] = useState<string[]>([]);
+
+  async function fetchAIIntel() {
+    setAiLoading(true);
+    setAiError("");
+    setAiHeadlines([]);
+    try {
+      const res = await fetch(
+        `/api/news?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "请求失败");
+      if (data.intel) setIntel(data.intel);
+      if (typeof data.homeImpact === "number") setHomeIntel(Math.max(-2, Math.min(2, data.homeImpact)));
+      if (typeof data.awayImpact === "number") setAwayIntel(Math.max(-2, Math.min(2, data.awayImpact)));
+      if (data.headlines) setAiHeadlines(data.headlines);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI分析失败，请重试");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   function auth() {
     if (pwd === ADMIN_PASSWORD) { setAuthed(true); setPwdError(""); }
@@ -190,12 +214,39 @@ export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }
 
           {/* 特别情报 */}
           <div className="space-y-2 border-t border-gray-800 pt-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">特别情报（伤停/换帅/内部消息）</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">特别情报（伤停/换帅/内部消息）</p>
+              <button
+                onClick={fetchAIIntel}
+                disabled={aiLoading}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-900/50 border border-cyan-500/40 text-cyan-400 text-xs font-semibold hover:bg-cyan-800/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {aiLoading ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                    分析中...
+                  </>
+                ) : (
+                  <>🤖 AI自动分析</>
+                )}
+              </button>
+            </div>
+            {aiError && (
+              <p className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-3 py-2">{aiError}</p>
+            )}
+            {aiHeadlines.length > 0 && (
+              <div className="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 space-y-1">
+                <p className="text-xs text-gray-500 font-mono">NEWS SOURCES ({aiHeadlines.length})</p>
+                {aiHeadlines.slice(0, 4).map((h, i) => (
+                  <p key={i} className="text-xs text-gray-400 truncate">· {h}</p>
+                ))}
+              </div>
+            )}
             <textarea
               placeholder="如：主队主力前锋因伤缺阵，客队近期换帅士气不稳..."
               value={intel}
               onChange={(e) => setIntel(e.target.value)}
-              rows={2}
+              rows={3}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-purple-400 resize-none"
             />
             <p className="text-xs text-gray-500">情报对比赛影响：</p>
