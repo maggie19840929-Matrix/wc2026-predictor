@@ -10,22 +10,13 @@ interface Props {
   onSaved: (home: number, draw: number, away: number) => void;
 }
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "wc2026";
-
 export function AyxOddsForm({ matchId, initialHome, initialDraw, initialAway, onSaved }: Props) {
   const [open, setOpen] = useState(false);
-  const [pwd, setPwd] = useState("");
-  const [authed, setAuthed] = useState(false);
   const [home, setHome] = useState(initialHome?.toString() ?? "");
   const [draw, setDraw] = useState(initialDraw?.toString() ?? "");
   const [away, setAway] = useState(initialAway?.toString() ?? "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
-
-  function auth() {
-    if (pwd === ADMIN_PASSWORD) setAuthed(true);
-    else setMsg("密码错误");
-  }
 
   async function save() {
     const h = parseFloat(home);
@@ -36,10 +27,7 @@ export function AyxOddsForm({ matchId, initialHome, initialDraw, initialAway, on
     setSaving(true);
     const res = await fetch("/api/odds", {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SYNC_SECRET || "my-secret-key-123"}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ match_id: matchId, home_odds: h, draw_odds: d, away_odds: a, secret: "my-secret-key-123" }),
     });
     setSaving(false);
@@ -54,12 +42,13 @@ export function AyxOddsForm({ matchId, initialHome, initialDraw, initialAway, on
   }
 
   if (!open) {
+    const hasOdds = initialHome && initialDraw && initialAway;
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs text-gray-600 hover:text-yellow-400 underline transition-colors"
+        className={`text-xs underline transition-colors ${hasOdds ? "text-yellow-400 hover:text-yellow-300" : "text-gray-600 hover:text-yellow-400"}`}
       >
-        ✏️ 录入爱游戏赔率
+        ✏️ {hasOdds ? "修改爱游戏赔率" : "录入爱游戏赔率"}
       </button>
     );
   }
@@ -70,70 +59,40 @@ export function AyxOddsForm({ matchId, initialHome, initialDraw, initialAway, on
         <p className="text-sm font-semibold text-yellow-300">录入爱游戏赔率</p>
         <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-white text-lg">×</button>
       </div>
-
-      {!authed ? (
-        <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">主胜</p>
           <input
-            type="password"
-            placeholder="管理密码"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && auth()}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-400"
+            type="number" step="0.01" placeholder="1.41"
+            value={home} onChange={(e) => setHome(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
           />
-          <button onClick={auth} className="w-full py-2 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-sm">
-            确认
-          </button>
-          {msg && <p className="text-red-400 text-xs text-center">{msg}</p>}
         </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">主胜</p>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="1.41"
-                value={home}
-                onChange={(e) => setHome(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
-              />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">和局</p>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="4.20"
-                value={draw}
-                onChange={(e) => setDraw(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
-              />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">客胜</p>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="7.40"
-                value={away}
-                onChange={(e) => setAway(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
-              />
-            </div>
-          </div>
-          <button
-            disabled={saving}
-            onClick={save}
-            className="w-full py-2 rounded-lg bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-700 text-black font-bold text-sm"
-          >
-            {saving ? "保存中..." : "保存"}
-          </button>
-          {msg && (
-            <p className={`text-xs text-center ${msg.includes("✓") ? "text-emerald-400" : "text-red-400"}`}>{msg}</p>
-          )}
+        <div>
+          <p className="text-xs text-gray-500 mb-1">和局</p>
+          <input
+            type="number" step="0.01" placeholder="4.20"
+            value={draw} onChange={(e) => setDraw(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
+          />
         </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-1">客胜</p>
+          <input
+            type="number" step="0.01" placeholder="7.40"
+            value={away} onChange={(e) => setAway(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-center font-bold focus:outline-none focus:border-yellow-400"
+          />
+        </div>
+      </div>
+      <button
+        disabled={saving} onClick={save}
+        className="w-full py-2 rounded-lg bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-700 text-black font-bold text-sm"
+      >
+        {saving ? "保存中..." : "保存"}
+      </button>
+      {msg && (
+        <p className={`text-xs text-center ${msg.includes("✓") ? "text-emerald-400" : "text-red-400"}`}>{msg}</p>
       )}
     </div>
   );

@@ -6,8 +6,8 @@ export const runtime = "nodejs";
 async function fetchNewsHeadlines(homeTeam: string, awayTeam: string): Promise<string[]> {
   const queries = [
     `${homeTeam} ${awayTeam} World Cup 2026`,
-    `${homeTeam} FIFA 2026`,
-    `${awayTeam} FIFA 2026`,
+    `${homeTeam} FIFA World Cup`,
+    `${awayTeam} FIFA World Cup`,
   ];
 
   const headlines: string[] = [];
@@ -16,16 +16,26 @@ async function fetchNewsHeadlines(homeTeam: string, awayTeam: string): Promise<s
     try {
       const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en&gl=US&ceid=US:en`;
       const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; WC2026Bot/1.0)" },
-        signal: AbortSignal.timeout(6000),
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/rss+xml, application/xml, text/xml, */*",
+        },
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) continue;
       const xml = await res.text();
-      // 解析 <title> 标签（跳过第一个，那是频道标题）
-      const matches = [...xml.matchAll(/<item>[\s\S]*?<title><!\[CDATA\[(.*?)\]\]><\/title>/g)];
-      for (const m of matches.slice(0, 4)) {
-        const title = m[1].trim();
-        if (title && !headlines.includes(title)) headlines.push(title);
+
+      // 兼容两种格式：CDATA 和普通文本
+      const cdataMatches = [...xml.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)];
+      const plainMatches = [...xml.matchAll(/<title>(?!\s*<!\[CDATA\[)(.*?)<\/title>/g)];
+      const allMatches = cdataMatches.length > 0 ? cdataMatches : plainMatches;
+
+      // 跳过第一个（频道标题）
+      for (const m of allMatches.slice(1, 6)) {
+        const title = m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+        if (title && title.length > 10 && !headlines.includes(title)) {
+          headlines.push(title);
+        }
       }
     } catch {
       // 单个查询失败不影响其他

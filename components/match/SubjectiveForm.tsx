@@ -20,8 +20,6 @@ interface Props {
   onSaved?: (data: SubjectiveData) => void;
 }
 
-const ADMIN_PASSWORD = "wc2026";
-
 function StarRating({ value, onChange, label }: {
   value: number;
   onChange: (v: number) => void;
@@ -83,9 +81,6 @@ function TripleToggle({ value, onChange, negLabel, posLabel }: {
 
 export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }: Props) {
   const [open, setOpen] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const [pwd, setPwd] = useState("");
-  const [pwdError, setPwdError] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -119,11 +114,6 @@ export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }
     } finally {
       setAiLoading(false);
     }
-  }
-
-  function auth() {
-    if (pwd === ADMIN_PASSWORD) { setAuthed(true); setPwdError(""); }
-    else setPwdError("密码错误");
   }
 
   async function save() {
@@ -176,23 +166,7 @@ export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }
         <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-white text-lg">×</button>
       </div>
 
-      {!authed ? (
-        <div className="space-y-3">
-          <input
-            type="password"
-            placeholder="管理密码"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && auth()}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
-          />
-          <button onClick={auth} className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm">
-            确认
-          </button>
-          {pwdError && <p className="text-red-400 text-xs text-center">{pwdError}</p>}
-        </div>
-      ) : (
-        <div className="space-y-5">
+      <div className="space-y-5">
           {/* 近期状态 */}
           <div className="space-y-3">
             <p className="text-xs text-gray-500 uppercase tracking-wider">近期状态（1=很差 5=极佳）</p>
@@ -273,7 +247,6 @@ export function SubjectiveForm({ matchId, homeTeam, awayTeam, initial, onSaved }
             <p className={`text-center text-sm ${msg.includes("✓") ? "text-emerald-400" : "text-red-400"}`}>{msg}</p>
           )}
         </div>
-      )}
     </div>
   );
 }
