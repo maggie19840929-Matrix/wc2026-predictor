@@ -16,6 +16,7 @@ async function fetchNewsHeadlines(homeTeam: string, awayTeam: string): Promise<s
     try {
       const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en&gl=US&ceid=US:en`;
       const res = await fetch(url, {
+        redirect: "follow",
         headers: {
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "application/rss+xml, application/xml, text/xml, */*",
@@ -25,14 +26,19 @@ async function fetchNewsHeadlines(homeTeam: string, awayTeam: string): Promise<s
       if (!res.ok) continue;
       const xml = await res.text();
 
-      // 兼容两种格式：CDATA 和普通文本
-      const cdataMatches = [...xml.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)];
-      const plainMatches = [...xml.matchAll(/<title>(?!\s*<!\[CDATA\[)(.*?)<\/title>/g)];
-      const allMatches = cdataMatches.length > 0 ? cdataMatches : plainMatches;
-
-      // 跳过第一个（频道标题）
-      for (const m of allMatches.slice(1, 6)) {
-        const title = m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      // 按 <item> 分割，从每条新闻中提取 <title>
+      const items = xml.split("<item>").slice(1);
+      for (const item of items.slice(0, 5)) {
+        const m = item.match(/<title>([\s\S]*?)<\/title>/);
+        if (!m) continue;
+        const title = m[1]
+          .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .trim();
         if (title && title.length > 10 && !headlines.includes(title)) {
           headlines.push(title);
         }
