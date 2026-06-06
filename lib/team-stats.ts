@@ -37,10 +37,10 @@ export interface H2HRecord {
 export async function getTeamRecentForm(teamId: number): Promise<RecentForm> {
   try {
     const data = await apiFetch(
-      `/teams/${teamId}/matches?status=FINISHED&limit=5&competitions=2000,2001,2018,2019,2021`
+      `/teams/${teamId}/matches?status=FINISHED&limit=5`
     );
 
-    const matches = (data.matches ?? []).slice(-5);
+    const matches = (data.matches ?? []).slice(0, 5);
     let wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0;
     const formChars: string[] = [];
 
