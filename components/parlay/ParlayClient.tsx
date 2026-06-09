@@ -43,6 +43,23 @@ export function ParlayClient({ matches }: { matches: MatchInput[] }) {
     );
   }
 
+  // 不足2场无法组合串关
+  if (candidates.length < 2) {
+    return (
+      <div className="space-y-5">
+        <CandidatePanel candidates={candidates} />
+        <div className="bg-gray-900 border border-yellow-500/20 rounded-2xl p-8 text-center space-y-3">
+          <p className="text-3xl">⏳</p>
+          <p className="text-yellow-400 font-semibold">串关需要至少 2 场比赛</p>
+          <p className="text-gray-500 text-sm">
+            目前只有 {candidates.length} 场比赛有赔率数据<br />
+            待更多比赛录入赔率后将自动生成串关组合
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {/* 候选场次 */}

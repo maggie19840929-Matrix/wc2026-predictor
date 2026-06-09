@@ -293,6 +293,9 @@ export function buildStrategy(
   const resultPools: BetPool[] = [];
   let totalBet = 0;
 
+  // 单关最低投注门槛：预算的5%（至少¥5）
+  const minSingleAmount = Math.max(5, Math.round(budget * 0.05));
+
   for (const [legs, fraction] of poolConf) {
     const bets = generatePool(candidates, legs);
     if (bets.length === 0) continue;
@@ -300,8 +303,14 @@ export function buildStrategy(
     const poolBudget = Math.round(budget * maxTotal * fraction);
     if (poolBudget < 1) continue;
 
-    const allocations = allocatePool(bets, poolBudget, km);
+    let allocations = allocatePool(bets, poolBudget, km);
     if (allocations.length === 0) continue;
+
+    // 单关：过滤掉建议金额低于门槛的注单（Kelly太小=优势不显著，不建议投）
+    if (legs === 1) {
+      allocations = allocations.filter((a) => a.amount >= minSingleAmount);
+      if (allocations.length === 0) continue;
+    }
 
     const actualTotal = allocations.reduce((s, a) => s + a.amount, 0);
     totalBet += actualTotal;
