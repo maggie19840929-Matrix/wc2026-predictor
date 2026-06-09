@@ -1,9 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { PredictFormClient } from "@/components/prediction/PredictFormClient";
 import { PredictionBar } from "@/components/ui/PredictionBar";
 import { ValueBadge } from "@/components/ui/ValueBadge";
 import { OddsTable } from "@/components/match/OddsTable";
-import { MatchDetailClient } from "@/components/match/MatchDetailClient";
+import { MatchInteractiveSection } from "@/components/match/MatchInteractiveSection";
 import { TeamStatsPanel } from "@/components/match/TeamStatsPanel";
 import { detectValueBets } from "@/lib/value-bet";
 import { getTeamRecentForm, getH2H } from "@/lib/team-stats";
@@ -140,11 +139,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         h2h={h2h}
       />
 
-      {/* 综合推荐 + 爱游戏赔率录入 */}
-      <MatchDetailClient
+      {/* 预测解锁 + 综合推荐（先预测再解锁AI分析） */}
+      <MatchInteractiveSection
         matchId={id}
         homeTeam={match.home_team.shortName}
         awayTeam={match.away_team.shortName}
+        canPredict={canPredict}
         communityHome={match.home_pct}
         communityDraw={match.draw_pct}
         communityAway={match.away_pct}
@@ -179,14 +179,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         />
       )}
 
-      {/* Predict form (client, reads username from localStorage) */}
-      {canPredict ? (
-        <PredictFormClient
-          matchId={id}
-          homeTeam={match.home_team.shortName}
-          awayTeam={match.away_team.shortName}
-        />
-      ) : (
+      {/* 比赛已开始/结束提示 */}
+      {!canPredict && (
         <div className="text-center py-4 text-gray-500 text-sm">
           {match.status === "FINISHED" ? "比赛已结束，预测窗口已关闭" : "比赛已开始，预测窗口已关闭"}
         </div>
