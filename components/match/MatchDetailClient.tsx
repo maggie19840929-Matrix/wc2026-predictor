@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { AyxOddsForm } from "./AyxOddsForm";
-import { AHForm } from "./AHForm";
 import { SubjectiveForm } from "./SubjectiveForm";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import type { RecentForm, H2HRecord } from "@/lib/team-stats";
@@ -62,14 +61,6 @@ export function MatchDetailClient(props: Props) {
             setAyxDraw(nd);
             setAyxAway(na);
           }}
-        />
-        <span className="text-gray-700">·</span>
-        <AHForm
-          matchId={matchId}
-          homeTeam={homeTeam}
-          awayTeam={awayTeam}
-          initial={initialAH}
-          onSaved={(data) => setAhData(data)}
         />
         <span className="text-gray-700">·</span>
         <SubjectiveForm
