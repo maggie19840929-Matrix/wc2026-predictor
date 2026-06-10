@@ -222,7 +222,7 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
     {
       label: "让球盘路",
       pct: hasAH ? Math.round((outcomeKey === "home" ? ahData!.homeAHWinRate : outcomeKey === "away" ? ahData!.awayAHWinRate : 0.5) * 100) : 0,
-      text: hasAH ? `${Math.round((outcomeKey === "home" ? ahData!.homeAHWinRate : outcomeKey === "away" ? ahData!.awayAHWinRate : 0.5) * 100)}%赢盘` : "待录入",
+      text: hasAH ? `~${Math.round((outcomeKey === "home" ? ahData!.homeAHWinRate : outcomeKey === "away" ? ahData!.awayAHWinRate : 0.5) * 100)}%` : "无数据",
       active: hasAH,
     },
   ];
