@@ -165,6 +165,14 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           subj_home_intel: row.subj_home_intel ?? undefined,
           subj_away_intel: row.subj_away_intel ?? undefined,
         }}
+        initialAH={
+          row.home_ah_win_rate != null ? {
+            homeAHWinRate: row.home_ah_win_rate as number,
+            awayAHWinRate: row.away_ah_win_rate as number,
+            homeOverRate: row.home_over_rate as number ?? undefined,
+            awayOverRate: row.away_over_rate as number ?? undefined,
+          } : undefined
+        }
       />
 
       {/* 多平台赔率对比 */}

@@ -5,7 +5,7 @@ import { getUsername } from "@/lib/username";
 import { MatchDetailClient } from "./MatchDetailClient";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import type { RecentForm, H2HRecord } from "@/lib/team-stats";
-import type { SubjectiveData } from "@/lib/recommendation";
+import type { SubjectiveData, AHData } from "@/lib/recommendation";
 import type { Outcome } from "@/types";
 
 interface Props {
@@ -25,6 +25,7 @@ interface Props {
   awayForm?: RecentForm;
   h2h?: H2HRecord;
   initialSubjective?: Partial<SubjectiveData>;
+  initialAH?: Partial<AHData>;
 }
 
 type Phase = "loading" | "locked" | "unlocking" | "revealed";

@@ -4,13 +4,21 @@ import type { RecentForm, H2HRecord } from "@/lib/team-stats";
 export type Outcome = "HOME" | "DRAW" | "AWAY";
 
 export interface SubjectiveData {
-  subj_home_form: number;   // 1-5
-  subj_away_form: number;   // 1-5
-  subj_motivation: number;  // -2~2, 正=有利主队
-  subj_venue: number;       // -2~2, 正=有利主队
-  subj_intel: string;       // 特别情报文字
-  subj_home_intel: number;  // -2~2
-  subj_away_intel: number;  // -2~2
+  subj_home_form: number;   // 1-5（保留结构用于数据读取，但不参与算法）
+  subj_away_form: number;
+  subj_motivation: number;
+  subj_venue: number;
+  subj_intel: string;       // 情报文字（仅展示，不参与评分）
+  subj_home_intel: number;
+  subj_away_intel: number;
+}
+
+/** 让球盘近期数据 */
+export interface AHData {
+  homeAHWinRate: number;  // 主队近10场赢盘率 0-1，如 0.6
+  awayAHWinRate: number;  // 客队近10场赢盘率 0-1
+  homeOverRate?: number;  // 主队近10场大球率（可选）
+  awayOverRate?: number;
 }
 
 export interface AyxOdds {
@@ -40,11 +48,18 @@ function fairProbs(home: number, draw: number, away: number) {
 }
 
 /**
- * 综合推荐算法
- * 综合三个维度：
- * 1. 社区预测概率
- * 2. 爱游戏价值边际（社区概率 - 爱游戏隐含概率）
- * 3. 各庄共识（the-odds-api 平均隐含概率）
+ * 综合推荐算法 v2
+ *
+ * 权重分配（共100%）：
+ *   社区预测概率     30%
+ *   AYX价值边际      25%
+ *   市场共识         15%
+ *   近期W/L状态      10%
+ *   历史交锋 H2H      5%
+ *   让球盘赢盘率     15%  ← 新增
+ *   主观评估数值      0%  ← 移除（防止恶意污染）
+ *
+ * 情报文字仍展示，但不参与评分。
  */
 export function recommend(
   communityHome: number,   // 社区预测百分比 0-100
@@ -55,7 +70,8 @@ export function recommend(
   homeForm?: RecentForm,
   awayForm?: RecentForm,
   h2h?: H2HRecord,
-  subjective?: SubjectiveData,
+  _subjective?: SubjectiveData,  // 保留参数兼容性，但不参与算法
+  ahData?: AHData,
 ): RecommendationResult {
   const comm = {
     home: communityHome / 100,
@@ -83,7 +99,7 @@ export function recommend(
     };
   }
 
-  // 爱游戏价值边际（正数 = 爱游戏赔率偏高 = 有价值）
+  // AYX价值边际（正数 = AYX赔率偏高 = 有价值）
   const ayxEdge = {
     home: comm.home - ayxFair.home,
     draw: comm.draw - ayxFair.draw,
@@ -97,19 +113,19 @@ export function recommend(
     away: comm.away - marketFair.away,
   };
 
-  // 客观数据评分（近期状态 + 历史交锋）
+  // ── 近期W/L状态 (10%) ──
   let formBoost = { home: 0, draw: 0, away: 0 };
   if (homeForm && awayForm && homeForm.played > 0 && awayForm.played > 0) {
     const homeWinRate = homeForm.wins / homeForm.played;
     const awayWinRate = awayForm.wins / awayForm.played;
     const homeGoalDiff = (homeForm.goalsFor - homeForm.goalsAgainst) / homeForm.played;
     const awayGoalDiff = (awayForm.goalsFor - awayForm.goalsAgainst) / awayForm.played;
-    // 状态差距越大，对强队方向加分
     const formDiff = (homeWinRate + homeGoalDiff * 0.05) - (awayWinRate + awayGoalDiff * 0.05);
     formBoost.home = formDiff * 0.1;
     formBoost.away = -formDiff * 0.1;
   }
 
+  // ── 历史交锋 H2H (5%) ──
   let h2hBoost = { home: 0, draw: 0, away: 0 };
   if (h2h && h2h.played >= 3) {
     const homeH2HRate = h2h.homeWins / h2h.played;
@@ -120,30 +136,30 @@ export function recommend(
     h2hBoost.draw = (drawH2HRate - 0.33) * 0.08;
   }
 
-  // 主观评估加分
-  let subjBoost = { home: 0, draw: 0, away: 0 };
-  if (subjective) {
-    const { subj_home_form, subj_away_form, subj_motivation, subj_venue, subj_home_intel, subj_away_intel } = subjective;
-    // 状态差距 (1-5分归一化到-0.1~0.1)
-    const formDiff = (subj_home_form - subj_away_form) / 5 * 0.1;
-    subjBoost.home += formDiff;
-    subjBoost.away -= formDiff;
-    // 赛事动力 (-2~2 归一化)
-    subjBoost.home += subj_motivation / 2 * 0.06;
-    subjBoost.away -= subj_motivation / 2 * 0.06;
-    // 场地气候
-    subjBoost.home += subj_venue / 2 * 0.05;
-    subjBoost.away -= subj_venue / 2 * 0.05;
-    // 特别情报
-    subjBoost.home += subj_home_intel / 2 * 0.05;
-    subjBoost.away += subj_away_intel / 2 * 0.05;
+  // ── 让球盘赢盘率 (15%) ──
+  // 赢盘率 > 0.5 说明球队近期表现超过庄家预期（即让球仍赢）
+  // 范围：0-1，归一化到 ±0.15
+  let ahBoost = { home: 0, draw: 0, away: 0 };
+  if (ahData) {
+    const { homeAHWinRate, awayAHWinRate } = ahData;
+    // 与0.5基准的偏差，乘以0.3得到最大±0.15的加成
+    ahBoost.home = (homeAHWinRate - 0.5) * 0.3;
+    ahBoost.away = (awayAHWinRate - 0.5) * 0.3;
+    // 双方赢盘率都高时，平局概率略升（强强对话更拉锯）
+    if (homeAHWinRate >= 0.6 && awayAHWinRate >= 0.6) {
+      ahBoost.draw += 0.02;
+    }
   }
 
-  // 综合评分：社区(30%) + 爱游戏价值(25%) + 市场共识(15%) + 客观数据(15%) + 主观评估(15%)
+  // ── 综合评分 ──
+  // 社区(30%) + AYX价值(25%) + 市场共识(15%) + 近期状态(10%) + H2H(5%) + AH盘路(15%)
   const score = (o: "home" | "draw" | "away") =>
-    comm[o] * 0.30 + ayxEdge[o] * 0.25 + marketEdge[o] * 0.15
-    + (formBoost[o] * 0.10 + h2hBoost[o] * 0.05)
-    + subjBoost[o] * 0.15;
+    comm[o] * 0.30
+    + ayxEdge[o] * 0.25
+    + marketEdge[o] * 0.15
+    + formBoost[o] * 0.10
+    + h2hBoost[o] * 0.05
+    + ahBoost[o] * 0.15;
 
   const scores = {
     home: score("home"),
@@ -158,36 +174,36 @@ export function recommend(
   const outcomeLabel = outcomeKey === "home" ? "主胜" : outcomeKey === "draw" ? "平局" : "客胜";
   const ayxOddsValue = ayx[outcomeKey];
 
-  // 置信度：基于社区概率 + 各方向一致性
+  // 置信度
   const communityProb = comm[outcomeKey];
   const ayxEdgeVal = ayxEdge[outcomeKey];
   const marketEdgeVal = marketEdge[outcomeKey];
 
-  // 基础置信度来自社区概率
   let confidence = Math.round(communityProb * 100);
-
-  // 爱游戏有正价值加分
   if (ayxEdgeVal > 0.05) confidence = Math.min(confidence + 10, 95);
   else if (ayxEdgeVal < -0.05) confidence = Math.max(confidence - 10, 20);
-
-  // 市场共识一致加分
   if (marketEdgeVal > 0.03) confidence = Math.min(confidence + 5, 95);
 
-  // 社区票数太少打折
+  // AH赢盘率加成置信度
+  if (ahData) {
+    const relevantAH = outcomeKey === "home" ? ahData.homeAHWinRate : outcomeKey === "away" ? ahData.awayAHWinRate : 0.5;
+    if (relevantAH >= 0.7) confidence = Math.min(confidence + 8, 95);
+    else if (relevantAH <= 0.3) confidence = Math.max(confidence - 8, 20);
+  }
+
   const totalPreds = communityHome + communityDraw + communityAway;
   if (totalPreds < 10) confidence = Math.round(confidence * 0.8);
 
   // 构建理由
   const reasons: string[] = [];
-
   reasons.push(`社区 ${Math.round(communityProb * 100)}% 看好此结果`);
 
   if (ayxEdgeVal > 0.03) {
-    reasons.push(`爱游戏赔率 ${ayxOddsValue} 存在 +${(ayxEdgeVal * 100).toFixed(1)}% 价值空间`);
+    reasons.push(`AYX赔率 ${ayxOddsValue} 存在 +${(ayxEdgeVal * 100).toFixed(1)}% 价值空间`);
   } else if (ayxEdgeVal < -0.03) {
-    reasons.push(`⚠️ 爱游戏赔率偏低，实际价值空间有限`);
+    reasons.push(`⚠️ AYX赔率偏低，实际价值空间有限`);
   } else {
-    reasons.push(`爱游戏赔率 ${ayxOddsValue} 与市场基本持平`);
+    reasons.push(`AYX赔率 ${ayxOddsValue} 与市场基本持平`);
   }
 
   if (bookmakers.length > 0) {
@@ -195,28 +211,29 @@ export function recommend(
     reasons.push(`各庄综合隐含概率 ${marketProb}%，与社区判断${Math.abs(communityProb * 100 - marketProb) < 5 ? "一致" : "存在分歧"}`);
   }
 
-  if (subjective) {
-    const { subj_home_form, subj_away_form, subj_motivation, subj_venue } = subjective;
-    if (Math.abs(subj_home_form - subj_away_form) >= 2) {
-      const stronger = subj_home_form > subj_away_form ? "主队" : "客队";
-      reasons.push(`主观评估：${stronger}近期状态明显更佳`);
-    }
-    if (Math.abs(subj_motivation) >= 1) {
-      const side = subj_motivation > 0 ? "主队" : "客队";
-      reasons.push(`${side}求胜动力更强，赛事重要性加分`);
-    }
-    if (Math.abs(subj_venue) >= 1) {
-      reasons.push(subj_venue > 0 ? "场地/气候有利主队" : "场地/气候不利主队");
+  if (ahData) {
+    const homeRate = Math.round(ahData.homeAHWinRate * 100);
+    const awayRate = Math.round(ahData.awayAHWinRate * 100);
+    if (ahData.homeAHWinRate >= 0.6) reasons.push(`主队近期赢盘率 ${homeRate}%，超预期表现稳定`);
+    else if (ahData.homeAHWinRate <= 0.4) reasons.push(`⚠️ 主队近期赢盘率仅 ${homeRate}%，覆盖能力偏弱`);
+    if (ahData.awayAHWinRate >= 0.6) reasons.push(`客队近期赢盘率 ${awayRate}%，客场表现超预期`);
+    else if (ahData.awayAHWinRate <= 0.4) reasons.push(`⚠️ 客队近期赢盘率仅 ${awayRate}%，客场覆盖偏弱`);
+  }
+
+  if (homeForm && awayForm && homeForm.played > 0) {
+    const homeWR = Math.round(homeForm.wins / homeForm.played * 100);
+    const awayWR = Math.round(awayForm.wins / awayForm.played * 100);
+    if (Math.abs(homeWR - awayWR) >= 20) {
+      reasons.push(`近期胜率：主队 ${homeWR}% vs 客队 ${awayWR}%，状态差距明显`);
     }
   }
 
   // 警告
   let warning: string | undefined;
-  if (ayxEdgeVal < -0.08) {
-    warning = "爱游戏对此结果赔率明显偏低，谨慎投注";
-  }
-  if (communityProb < 0.35) {
-    warning = "社区对此结果信心不足，风险较高";
+  if (ayxEdgeVal < -0.08) warning = "AYX对此结果赔率明显偏低，谨慎投注";
+  if (communityProb < 0.35) warning = "社区对此结果信心不足，风险较高";
+  if (ahData && outcomeKey === "home" && ahData.homeAHWinRate <= 0.3) {
+    warning = "主队近期赢盘率极低，即使胜出也可能让球失利";
   }
 
   return { outcome, label: outcomeLabel, confidence, ayxOdds: ayxOddsValue, reasons, warning };
