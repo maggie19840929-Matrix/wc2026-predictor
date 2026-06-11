@@ -211,7 +211,6 @@ function generatePool(candidates: MatchCandidate[], legs: number): ParlayBet[] {
       if (ev <= 0 || kf <= 0.003) continue;
 
       const isPrimaryCombo = combo.every((s) => s.isPrimary);
-      const risk: ParlayBet["risk"] = legs === 1 ? "safe" : legs === 2 ? "medium" : "bold";
 
       bets.push({
         id: combo.map((s) => `${s.matchId}:${s.outcome}`).join("|"),
@@ -223,7 +222,6 @@ function generatePool(candidates: MatchCandidate[], legs: number): ParlayBet[] {
         expectedValue: ev,
         kellyFraction: kf,
         isPrimaryCombo,
-        risk,
       });
     }
   }
