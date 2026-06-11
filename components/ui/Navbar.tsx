@@ -21,6 +21,7 @@ export function Navbar() {
   const links = [
     { href: "/", label: "赛程" },
     { href: "/parlay", label: "串关策略" },
+    { href: "/ledger", label: "小账本" },
     { href: "/leaderboard", label: "排行榜" },
   ];
 
