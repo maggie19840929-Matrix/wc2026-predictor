@@ -29,7 +29,7 @@ interface Props {
 
 export function MatchDetailClient(props: Props) {
   const { matchId, homeTeam, awayTeam, communityHome, communityDraw, communityAway,
-    initialAyxHome, initialAyxDraw, initialAyxAway, bookmakers,
+    totalPredictions, initialAyxHome, initialAyxDraw, initialAyxAway, bookmakers,
     homeForm, awayForm, h2h, initialAH, initialIntel } = props;
 
   const [ayxHome, setAyxHome] = useState(initialAyxHome);
@@ -89,6 +89,7 @@ export function MatchDetailClient(props: Props) {
           communityHome={communityHome}
           communityDraw={communityDraw}
           communityAway={communityAway}
+          totalPredictions={totalPredictions}
           hasH2H={!!(h2h && h2h.played > 0)}
           ahData={ahData}
           homeForm={homeForm}
@@ -117,11 +118,12 @@ function fairProbs(home: number, draw: number, away: number) {
 }
 
 function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
-  communityHome, communityDraw, communityAway, hasH2H,
+  communityHome, communityDraw, communityAway, totalPredictions, hasH2H,
   ahData, homeForm, awayForm, h2h, bookmakers, intel }: {
   homeTeam: string; awayTeam: string;
   homeOdds: number; drawOdds: number; awayOdds: number;
   communityHome: number; communityDraw: number; communityAway: number;
+  totalPredictions: number;
   hasH2H: boolean;
   ahData?: AHData;
   homeForm?: RecentForm; awayForm?: RecentForm; h2h?: H2HRecord;
@@ -129,7 +131,7 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
   intel?: IntelFactors | null;
 }) {
   const ayxFair = fairProbs(homeOdds, drawOdds, awayOdds);
-  const comm = { home: communityHome / 100, draw: communityDraw / 100, away: communityAway / 100 };
+  const rawComm = { home: communityHome / 100, draw: communityDraw / 100, away: communityAway / 100 };
 
   let marketFair = { home: 0.33, draw: 0.33, away: 0.34 };
   if (bookmakers.length > 0) {
@@ -139,6 +141,17 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
     }, { home: 0, draw: 0, away: 0 });
     marketFair = { home: sum.home / bookmakers.length, draw: sum.draw / bookmakers.length, away: sum.away / bookmakers.length };
   }
+
+  // 小样本打折：投票<5人时，社区概率向庄家共识收缩（避免2票=100%这种噪音带歪）
+  const smallSample = totalPredictions < 5;
+  const shrinkTarget = bookmakers.length > 0 ? marketFair : ayxFair;
+  const comm = smallSample
+    ? {
+        home: 0.3 * rawComm.home + 0.7 * shrinkTarget.home,
+        draw: 0.3 * rawComm.draw + 0.7 * shrinkTarget.draw,
+        away: 0.3 * rawComm.away + 0.7 * shrinkTarget.away,
+      }
+    : rawComm;
 
   const edge = {
     home: comm.home - ayxFair.home,
@@ -216,6 +229,9 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
     }
   }
 
+  // 小样本：置信度打8折
+  if (smallSample) confidence = Math.round(confidence * 0.8);
+
   const verdict = confidence >= 75 ? { label: "强烈推荐", icon: "🟢", color: "emerald" }
     : confidence >= 60 ? { label: "可以考虑", icon: "🟡", color: "yellow" }
     : confidence >= 45 ? { label: "谨慎观望", icon: "🟠", color: "orange" }
@@ -234,7 +250,7 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
   const intelPct = intelActive ? Math.min(100, Math.abs(iDiff) / 6 * 100) : 0;
 
   const dims = [
-    { label: "社区预测", pct: communityPct, text: `${Math.round(communityPct)}%`, active: communityPct >= 40 },
+    { label: "社区预测", pct: communityPct, text: smallSample ? `${totalPredictions}票·参考低` : `${Math.round(communityPct)}%`, active: !smallSample && communityPct >= 40 },
     { label: "赔率价值", pct: Math.min(100, bestOdds * 30), text: `${bestOdds}`, active: bestOdds >= 1.8 },
     { label: "近期状态", pct: homeForm && homeForm.played > 0 ? 65 : 30, text: homeForm && homeForm.played > 0 ? "已分析" : "待分析", active: !!(homeForm && homeForm.played > 0) },
     {
