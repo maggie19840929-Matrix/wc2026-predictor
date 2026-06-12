@@ -29,6 +29,7 @@ export async function POST(req: Request) {
         draw_odds: odds.best_draw,
         away_odds: odds.best_away,
         odds_detail: odds.bookmakers,
+        totals_detail: odds.totals,
         updated_at: new Date().toISOString(),
       })
       .ilike("home_team_name", `%${odds.home_team.split(" ")[0]}%`);

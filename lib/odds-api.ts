@@ -9,11 +9,21 @@ export interface BookmakerOdds {
   away: number;
 }
 
+/** 单个庄家的大小球赔率（某条盘口线） */
+export interface TotalsOdds {
+  key: string;
+  title: string;
+  line: number;   // 盘口线，如 2.5
+  over: number;   // 大球赔率
+  under: number;  // 小球赔率
+}
+
 export interface MatchOdds {
   home_team: string;
   away_team: string;
   commence_time: string;
   bookmakers: BookmakerOdds[];
+  totals: TotalsOdds[];
   best_home: number;
   best_draw: number;
   best_away: number;
@@ -22,35 +32,49 @@ export interface MatchOdds {
   best_away_book: string;
 }
 
-// 拉取世界杯所有比赛赔率
+// 拉取世界杯所有比赛赔率（含 1X2 与 大小球）
 export async function fetchWCOdds(): Promise<MatchOdds[]> {
-  const url = `${BASE}/sports/soccer_fifa_world_cup/odds/?apiKey=${KEY}&regions=eu&markets=h2h&oddsFormat=decimal`;
+  const url = `${BASE}/sports/soccer_fifa_world_cup/odds/?apiKey=${KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`odds-api error: ${res.status}`);
   const data = await res.json();
 
   return data.map((event: OddsEvent) => {
     const books: BookmakerOdds[] = [];
+    const totals: TotalsOdds[] = [];
 
     for (const bm of event.bookmakers) {
-      const h2h = bm.markets.find((m: { key: string }) => m.key === "h2h");
-      if (!h2h) continue;
-      const homeOdds = h2h.outcomes.find((o: { name: string }) => o.name === event.home_team)?.price;
-      const awayOdds = h2h.outcomes.find((o: { name: string }) => o.name === event.away_team)?.price;
-      const drawOdds = h2h.outcomes.find((o: { name: string }) => o.name === "Draw")?.price;
-      if (!homeOdds || !awayOdds || !drawOdds) continue;
-      books.push({ key: bm.key, title: bm.title, home: homeOdds, draw: drawOdds, away: awayOdds });
+      // 1X2
+      const h2h = bm.markets.find((m) => m.key === "h2h");
+      if (h2h) {
+        const homeOdds = h2h.outcomes.find((o) => o.name === event.home_team)?.price;
+        const awayOdds = h2h.outcomes.find((o) => o.name === event.away_team)?.price;
+        const drawOdds = h2h.outcomes.find((o) => o.name === "Draw")?.price;
+        if (homeOdds && awayOdds && drawOdds) {
+          books.push({ key: bm.key, title: bm.title, home: homeOdds, draw: drawOdds, away: awayOdds });
+        }
+      }
+      // 大小球
+      const tot = bm.markets.find((m) => m.key === "totals");
+      if (tot) {
+        const over = tot.outcomes.find((o) => o.name === "Over");
+        const under = tot.outcomes.find((o) => o.name === "Under");
+        if (over && under && over.point != null) {
+          totals.push({ key: bm.key, title: bm.title, line: over.point, over: over.price, under: under.price });
+        }
+      }
     }
 
-    const best_home = Math.max(...books.map((b) => b.home));
-    const best_draw = Math.max(...books.map((b) => b.draw));
-    const best_away = Math.max(...books.map((b) => b.away));
+    const best_home = books.length ? Math.max(...books.map((b) => b.home)) : 0;
+    const best_draw = books.length ? Math.max(...books.map((b) => b.draw)) : 0;
+    const best_away = books.length ? Math.max(...books.map((b) => b.away)) : 0;
 
     return {
       home_team: event.home_team,
       away_team: event.away_team,
       commence_time: event.commence_time,
       bookmakers: books,
+      totals,
       best_home,
       best_draw,
       best_away,
@@ -71,7 +95,7 @@ interface OddsEvent {
     title: string;
     markets: {
       key: string;
-      outcomes: { name: string; price: number }[];
+      outcomes: { name: string; price: number; point?: number }[];
     }[];
   }[];
 }

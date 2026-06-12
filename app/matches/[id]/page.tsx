@@ -3,10 +3,11 @@ import { PredictionBar } from "@/components/ui/PredictionBar";
 import { ValueBadge } from "@/components/ui/ValueBadge";
 import { OddsTable } from "@/components/match/OddsTable";
 import { MatchInteractiveSection } from "@/components/match/MatchInteractiveSection";
+import { TotalsSection } from "@/components/match/TotalsSection";
 import { TeamStatsPanel } from "@/components/match/TeamStatsPanel";
 import { detectValueBets } from "@/lib/value-bet";
 import { getTeamRecentForm, getH2H } from "@/lib/team-stats";
-import type { BookmakerOdds } from "@/lib/odds-api";
+import type { BookmakerOdds, TotalsOdds } from "@/lib/odds-api";
 import type { IntelFactors } from "@/lib/intel";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -59,6 +60,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const canPredict = new Date(match.utc_date) > new Date() && match.status === "TIMED";
   const valueBets = detectValueBets(match);
   const oddsDetail: BookmakerOdds[] = (row.odds_detail as BookmakerOdds[]) ?? [];
+  const totalsDetail: TotalsOdds[] = (row.totals_detail as TotalsOdds[]) ?? [];
 
   // 并行拉取客观数据
   const [homeForm, awayForm, h2h] = await Promise.all([
@@ -162,6 +164,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           awayAHWinRate: awayForm.estimatedAHWinRate,
         } : undefined}
         initialIntel={(row.intel_factors as IntelFactors | null) ?? null}
+      />
+
+      {/* 大小球分析 */}
+      <TotalsSection
+        matchId={id}
+        totalsDetail={totalsDetail}
+        initialLine={row.ayx_total_line as number ?? undefined}
+        initialOver={row.ayx_over as number ?? undefined}
+        initialUnder={row.ayx_under as number ?? undefined}
       />
 
       {/* 多平台赔率对比 */}
