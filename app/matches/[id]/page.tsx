@@ -7,6 +7,7 @@ import { TeamStatsPanel } from "@/components/match/TeamStatsPanel";
 import { detectValueBets } from "@/lib/value-bet";
 import { getTeamRecentForm, getH2H } from "@/lib/team-stats";
 import type { BookmakerOdds } from "@/lib/odds-api";
+import type { IntelFactors } from "@/lib/intel";
 import Image from "next/image";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -156,19 +157,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         homeForm={homeForm}
         awayForm={awayForm}
         h2h={h2h}
-        initialSubjective={{
-          subj_home_form: row.subj_home_form ?? undefined,
-          subj_away_form: row.subj_away_form ?? undefined,
-          subj_motivation: row.subj_motivation ?? undefined,
-          subj_venue: row.subj_venue ?? undefined,
-          subj_intel: row.subj_intel ?? undefined,
-          subj_home_intel: row.subj_home_intel ?? undefined,
-          subj_away_intel: row.subj_away_intel ?? undefined,
-        }}
         initialAH={homeForm && awayForm && homeForm.played > 0 && awayForm.played > 0 ? {
           homeAHWinRate: homeForm.estimatedAHWinRate,
           awayAHWinRate: awayForm.estimatedAHWinRate,
         } : undefined}
+        initialIntel={(row.intel_factors as IntelFactors | null) ?? null}
       />
 
       {/* 多平台赔率对比 */}

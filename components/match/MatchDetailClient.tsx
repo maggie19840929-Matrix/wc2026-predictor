@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { AyxOddsForm } from "./AyxOddsForm";
-import { SubjectiveForm } from "./SubjectiveForm";
+import { IntelForm } from "./IntelForm";
 import type { BookmakerOdds } from "@/lib/odds-api";
 import type { RecentForm, H2HRecord } from "@/lib/team-stats";
-import type { SubjectiveData, AHData } from "@/lib/recommendation";
+import type { AHData } from "@/lib/recommendation";
+import { type IntelFactors, intelDiff, intelBoost, hasIntel } from "@/lib/intel";
 
 interface Props {
   matchId: string;
@@ -22,14 +23,14 @@ interface Props {
   homeForm?: RecentForm;
   awayForm?: RecentForm;
   h2h?: H2HRecord;
-  initialSubjective?: Partial<SubjectiveData>;
   initialAH?: Partial<AHData>;
+  initialIntel?: IntelFactors | null;
 }
 
 export function MatchDetailClient(props: Props) {
   const { matchId, homeTeam, awayTeam, communityHome, communityDraw, communityAway,
     initialAyxHome, initialAyxDraw, initialAyxAway, bookmakers,
-    homeForm, awayForm, h2h, initialSubjective, initialAH } = props;
+    homeForm, awayForm, h2h, initialAH, initialIntel } = props;
 
   const [ayxHome, setAyxHome] = useState(initialAyxHome);
   const [ayxDraw, setAyxDraw] = useState(initialAyxDraw);
@@ -37,10 +38,7 @@ export function MatchDetailClient(props: Props) {
   const [ahData, setAhData] = useState<AHData | undefined>(
     initialAH?.homeAHWinRate != null ? (initialAH as AHData) : undefined
   );
-  // subjective仍保留用于展示情报文字，但不参与算法
-  const [subjective, setSubjective] = useState<SubjectiveData | undefined>(
-    initialSubjective?.subj_home_form ? (initialSubjective as SubjectiveData) : undefined
-  );
+  const [intel, setIntel] = useState<IntelFactors | null>(initialIntel ?? null);
 
   const h = ayxHome ?? (bookmakers.length > 0 ? Math.max(...bookmakers.map((b) => b.home)) : 0);
   const d = ayxDraw ?? (bookmakers.length > 0 ? Math.max(...bookmakers.map((b) => b.draw)) : 0);
@@ -63,20 +61,20 @@ export function MatchDetailClient(props: Props) {
           }}
         />
         <span className="text-gray-700">·</span>
-        <SubjectiveForm
+        <IntelForm
           matchId={matchId}
           homeTeam={homeTeam}
           awayTeam={awayTeam}
-          initial={initialSubjective}
-          onSaved={(data) => setSubjective(data)}
+          initial={intel}
+          onSaved={(data) => setIntel(data)}
         />
       </div>
 
-      {/* 情报展示（文字，不参与算法） */}
-      {subjective?.subj_intel && (
-        <div className="bg-gray-900/60 border border-purple-500/20 rounded-xl px-4 py-3">
-          <p className="text-xs text-purple-400 font-mono mb-1">📡 INTEL</p>
-          <p className="text-sm text-gray-300">{subjective.subj_intel}</p>
+      {/* 情报展示 */}
+      {intel?.note && (
+        <div className="bg-gray-900/60 border border-orange-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-orange-400 font-mono mb-1">📡 INTEL</p>
+          <p className="text-sm text-gray-300">{intel.note}</p>
         </div>
       )}
 
@@ -97,6 +95,7 @@ export function MatchDetailClient(props: Props) {
           awayForm={awayForm}
           h2h={h2h}
           bookmakers={bookmakers}
+          intel={intel}
         />
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-6 text-center space-y-2">
@@ -119,7 +118,7 @@ function fairProbs(home: number, draw: number, away: number) {
 
 function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
   communityHome, communityDraw, communityAway, hasH2H,
-  ahData, homeForm, awayForm, h2h, bookmakers }: {
+  ahData, homeForm, awayForm, h2h, bookmakers, intel }: {
   homeTeam: string; awayTeam: string;
   homeOdds: number; drawOdds: number; awayOdds: number;
   communityHome: number; communityDraw: number; communityAway: number;
@@ -127,6 +126,7 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
   ahData?: AHData;
   homeForm?: RecentForm; awayForm?: RecentForm; h2h?: H2HRecord;
   bookmakers: BookmakerOdds[];
+  intel?: IntelFactors | null;
 }) {
   const ayxFair = fairProbs(homeOdds, drawOdds, awayOdds);
   const comm = { home: communityHome / 100, draw: communityDraw / 100, away: communityAway / 100 };
@@ -170,11 +170,16 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
     h2hBoost.draw = (h2h.draws / h2h.played - 0.33) * 0.08;
   }
 
-  // 综合评分：社区30% + AYX价值25% + 市场共识15% + 近期状态10% + H2H5% + AH盘路15%
+  // 情报加成（零和：利好主队=不利客队，封顶）
+  const iDiff = intelDiff(intel);
+  const iBoost = intelBoost(intel); // {home,away} ∈ [-1,1]
+  const intelActive = hasIntel(intel);
+
+  // 综合评分：社区25% + AYX价值25% + 市场15% + 状态10% + H2H5% + 盘路10% + 情报(±0.03)
   const scores = {
-    home: comm.home * 0.30 + edge.home * 0.25 + (comm.home - marketFair.home) * 0.15 + formBoost.home * 0.10 + h2hBoost.home * 0.05 + ahBoost.home * 0.15,
-    draw: comm.draw * 0.30 + edge.draw * 0.25 + (comm.draw - marketFair.draw) * 0.15 + formBoost.draw * 0.10 + h2hBoost.draw * 0.05 + ahBoost.draw * 0.15,
-    away: comm.away * 0.30 + edge.away * 0.25 + (comm.away - marketFair.away) * 0.15 + formBoost.away * 0.10 + h2hBoost.away * 0.05 + ahBoost.away * 0.15,
+    home: comm.home * 0.25 + edge.home * 0.25 + (comm.home - marketFair.home) * 0.15 + formBoost.home * 0.10 + h2hBoost.home * 0.05 + ahBoost.home * 0.10 + iBoost.home * 0.03,
+    draw: comm.draw * 0.25 + edge.draw * 0.25 + (comm.draw - marketFair.draw) * 0.15 + formBoost.draw * 0.10 + h2hBoost.draw * 0.05 + ahBoost.draw * 0.10,
+    away: comm.away * 0.25 + edge.away * 0.25 + (comm.away - marketFair.away) * 0.15 + formBoost.away * 0.10 + h2hBoost.away * 0.05 + ahBoost.away * 0.10 + iBoost.away * 0.03,
   };
 
   const entries = Object.entries(scores) as ["home" | "draw" | "away", number][];
@@ -195,6 +200,22 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
     else if (relevantAH <= 0.3) confidence = Math.max(confidence - 8, 20);
   }
 
+  // 情报对置信度的影响（仅主/客胜方向，平局不适用）
+  let intelWarning: string | undefined;
+  if (intelActive && outcomeKey !== "draw" && iDiff !== 0) {
+    const supports = (outcomeKey === "home" && iDiff > 0) || (outcomeKey === "away" && iDiff < 0);
+    const strong = Math.abs(iDiff) >= 3;
+    if (supports) {
+      confidence = Math.min(confidence + (strong ? 8 : 4), 95);
+    } else {
+      confidence = Math.max(confidence - (strong ? 10 : 5), 20);
+      if (strong) {
+        const favored = iDiff > 0 ? homeTeam : awayTeam;
+        intelWarning = `情报面明显利好${favored}，与该推荐方向相左，需谨慎`;
+      }
+    }
+  }
+
   const verdict = confidence >= 75 ? { label: "强烈推荐", icon: "🟢", color: "emerald" }
     : confidence >= 60 ? { label: "可以考虑", icon: "🟡", color: "yellow" }
     : confidence >= 45 ? { label: "谨慎观望", icon: "🟠", color: "orange" }
@@ -205,17 +226,24 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
   const barColor = verdict.color === "emerald" ? "bg-emerald-500" : verdict.color === "yellow" ? "bg-yellow-500" : verdict.color === "orange" ? "bg-orange-500" : "bg-red-500";
 
   const hasAH = !!ahData;
+  // 情报维度文案
+  const intelText = !intelActive ? "无情报"
+    : iDiff > 0 ? `利好${homeTeam} +${iDiff}`
+    : iDiff < 0 ? `利好${awayTeam} ${iDiff}`
+    : "中性";
+  const intelPct = intelActive ? Math.min(100, Math.abs(iDiff) / 6 * 100) : 0;
+
   const dims = [
     { label: "社区预测", pct: communityPct, text: `${Math.round(communityPct)}%`, active: communityPct >= 40 },
     { label: "赔率价值", pct: Math.min(100, bestOdds * 30), text: `${bestOdds}`, active: bestOdds >= 1.8 },
     { label: "近期状态", pct: homeForm && homeForm.played > 0 ? 65 : 30, text: homeForm && homeForm.played > 0 ? "已分析" : "待分析", active: !!(homeForm && homeForm.played > 0) },
-    { label: "历史交锋", pct: hasH2H ? 65 : 20, text: hasH2H ? "已分析" : "数据少", active: hasH2H },
     {
       label: "让球盘路",
       pct: hasAH ? Math.round((outcomeKey === "home" ? ahData!.homeAHWinRate : outcomeKey === "away" ? ahData!.awayAHWinRate : 0.5) * 100) : 0,
       text: hasAH ? `~${Math.round((outcomeKey === "home" ? ahData!.homeAHWinRate : outcomeKey === "away" ? ahData!.awayAHWinRate : 0.5) * 100)}%` : "无数据",
       active: hasAH,
     },
+    { label: "事实情报", pct: intelPct, text: intelText, active: intelActive },
   ];
 
   return (
@@ -265,7 +293,7 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
         <div className="space-y-2.5 pt-2 border-t border-gray-800">
           <p className="text-xs font-mono text-gray-600 tracking-widest">DIMENSION ANALYSIS</p>
           {dims.map((d) => (
-            <div key={d.label} className="grid grid-cols-[88px_1fr_72px] items-center gap-3">
+            <div key={d.label} className="grid grid-cols-[88px_1fr_84px] items-center gap-3">
               <span className="text-xs text-gray-500 font-mono uppercase tracking-wide">{d.label}</span>
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${d.active ? "bg-cyan-500" : "bg-gray-600"}`}
@@ -275,6 +303,12 @@ function RecoCard({ homeTeam, awayTeam, homeOdds, drawOdds, awayOdds,
             </div>
           ))}
         </div>
+
+        {intelWarning && (
+          <div className="border border-orange-500/30 bg-orange-950/30 rounded-xl px-4 py-2 text-xs text-orange-400 font-mono">
+            ⚠ {intelWarning}
+          </div>
+        )}
 
         <div className={`border ${borderColor} bg-black/50 rounded-xl px-4 py-3 text-center`}>
           <p className="text-xs font-mono text-gray-500 mb-1">EXECUTE ON AYX.COM</p>
