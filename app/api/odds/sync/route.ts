@@ -17,12 +17,16 @@ export async function POST(req: Request) {
   const oddsData = await fetchWCOdds();
 
   let updated = 0;
+  let skipped = 0;
   for (const odds of oddsData) {
     if (odds.bookmakers.length === 0) continue;
 
-    // 用最佳赔率（取各庄最高）写入 matches 表
-    // 同时把完整 bookmakers JSON 存到 odds_detail 字段
-    const { error } = await supabase
+    // 同时匹配主队+客队首词，避免"同首词不同对手"串台
+    // （旧bug：只匹配主队首词 → Brazil vs Morocco 和 Brazil vs Haiti 拿到同一份赔率）
+    const homeKey = odds.home_team.split(" ")[0];
+    const awayKey = odds.away_team.split(" ")[0];
+
+    const { data: rows, error } = await supabase
       .from("matches")
       .update({
         home_odds: odds.best_home,
@@ -32,10 +36,13 @@ export async function POST(req: Request) {
         totals_detail: odds.totals,
         updated_at: new Date().toISOString(),
       })
-      .ilike("home_team_name", `%${odds.home_team.split(" ")[0]}%`);
+      .ilike("home_team_name", `%${homeKey}%`)
+      .ilike("away_team_name", `%${awayKey}%`)
+      .select("id");
 
-    if (!error) updated++;
+    if (!error && rows && rows.length > 0) updated++;
+    else skipped++;
   }
 
-  return NextResponse.json({ updated, total: oddsData.length });
+  return NextResponse.json({ updated, skipped, total: oddsData.length });
 }
